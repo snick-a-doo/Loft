@@ -16,32 +16,35 @@ Body::Body(double mass, const M3& inertia,
 {
 }
 
-void Body::add(Body_ptr part)
+void Body::capture(Body_ptr part)
 {
     add_momentum(part);
+    m_subs.push_back(part);
     part->m_parent = this;
+
     // Set the body's frame relative to the parent's frame.
     part->m_r = transform_in(part->m_r);
     part->m_orientation = tr(m_orientation)*part->m_orientation;
     part->m_v_cm = V0;
     part->m_omega = V0;
-    m_subs.push_back(part);
 }
 
 void Body::release(Body_ptr part)
 {
     auto it = std::find(m_subs.begin(), m_subs.end(), part);
+    assert(it != m_subs.end());
     if (it == m_subs.end())
         return;
-    auto a = top();
-    // part->m_omega = head_omega;
-    auto r = part->transform_out(m_r) - a->r_cm();
-    part->m_v_cm = a->v_cm() + cross(a->omega(), r);
-    part->m_r += transform_out(m_r);
-    part->m_parent = nullptr;
 
+    auto cm = r_cm();
+    part->m_parent = nullptr;
     m_subs.erase(it);
-    // release_momentum(part);
+
+    part->m_r = transform_out(part->m_r);
+    part->m_orientation = m_orientation*part->m_orientation;
+    part->m_v_cm = m_v_cm + cross(m_omega, part->m_r - cm);
+    m_v_cm += cross(m_omega, m_r - cm);
+    part->m_omega = m_omega;
 }
 
 void Body::add_momentum(const Body_ptr part)
@@ -83,25 +86,25 @@ void Body::add_momentum(const Body_ptr part)
 
 V3 Body::rotate_in(const V3& v) const
 {
-    V3 v_in = m_orientation*v;
+    V3 v_in = tr(m_orientation)*v;
     return m_parent ? m_parent->rotate_in(v_in) : v_in;
 }
 
 V3 Body::transform_in(const V3& v) const
 {
-    V3 v_in = m_orientation*(v - m_r);
+    V3 v_in = tr(m_orientation)*(v - m_r);
     return m_parent ? m_parent->transform_in(v_in) : v_in;
 }
 
 V3 Body::rotate_out(const V3& v) const
 {
-    V3 v_out = tr(m_orientation)*v;
+    V3 v_out = m_orientation*v;
     return m_parent ? m_parent->rotate_out(v_out) : v_out;
 }
 
 V3 Body::transform_out(const V3& v) const
 {
-    V3 v_out = m_r + tr(m_orientation)*v;
+    V3 v_out = m_r + m_orientation*v;
     return m_parent ? m_parent->transform_out(v_out) : v_out;
 }
 
@@ -161,14 +164,14 @@ const V3& Body::omega() const
 
 void Body::step(double time)
 {
-    auto dr = r_cm() - m_r;
-    auto dr_in = rotate_in(dr);
-    m_r += dr;
-    //!! transform to cm
-    m_r += m_v_cm*time;
+    // The origin of the body, m_r, is generally not at the CM.  Find the new origin after
+    // rotation by transforming CM - m_r into the body's frame before rotating the body,
+    // and then transforming back out of the body's frame.
+    auto cm = r_cm();
+    auto dr = rotate_in(cm - m_r);
+    m_orientation = rot(m_orientation, m_omega*time);
+    m_r = cm + m_v_cm*time - rotate_out(dr);
+
     for (auto b : m_subs)
         b->step(time);
-    m_orientation = rot(m_orientation, -m_omega*time);
-    //!! transform back
-    m_r -= rotate_out(dr_in);
 }

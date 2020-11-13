@@ -20,7 +20,7 @@ public:
 
     /// Attach a body at its current position conserving linear and angular momentum.  The
     /// attached body becomes fixed in location and orientation relative to this body.
-    void add(Body_ptr part);
+    void capture(Body_ptr part);
     /// Remove the given body conserving linear and angular momentum.
     void release(Body_ptr part);
 
@@ -33,7 +33,7 @@ public:
     V3 r_cm() const;
     /// @return Velocity of the center of mass.
     V3 v_cm() const;
-    /// The matrix that transforms vectors to the body frame.
+    /// The matrix that rotates out of the body frame.
     const M3& orientation() const;
     /// @return A vector parallel to the axis of rotation whose magnitude is the body's
     /// angular velocity.
@@ -47,10 +47,14 @@ public:
     void step(double time);
 
 private:
-    V3 rotate_in(const V3&) const;
-    V3 transform_in(const V3&) const;
-    V3 rotate_out(const V3&) const;
-    V3 transform_out(const V3&) const;
+    /// Rotate an absolute point to this body's frame.
+    V3 rotate_in(const V3& v) const;
+    /// Transform an absolute position vector to this body's frame.
+    V3 transform_in(const V3& v) const;
+    /// Rotate a point in this body's frame to the absolute frame.
+    V3 rotate_out(const V3& v) const;
+    /// Transform a position vector in this body's frame to the absolute frame.
+    V3 transform_out(const V3& v) const;
 
     /// @return Total rotational inertia about a point.
     M3 I(const V3& center);
@@ -76,8 +80,9 @@ private:
     V3 m_r;
     /// The velocity of the center of mass of this sub-body.  Zero when there's a parent.
     V3 m_v_cm;
-    /// The matrix that rotates vectors from the parent's (or absolute vectors if no
-    /// parent) frame to this body's frame.
+    /// The matrix that rotates vectors from the body frame to the parent's frame.  A
+    /// vector in the direction v in the body frame is in the direction m_orientation*v in
+    /// the parent frame.
     M3 m_orientation;
     /// The angular velocity of the center of mass of this sub-body.  Zero when there's a
     /// parent.
