@@ -162,6 +162,11 @@ const V3& Body::omega() const
     return m_omega;
 }
 
+void Body::impulse(const V3& imp)
+{
+    m_v_cm += imp/m();
+}
+
 void Body::step(double time)
 {
     // The origin of the body, m_r, is generally not at the CM.  Find the new origin after

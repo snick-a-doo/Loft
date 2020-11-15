@@ -43,10 +43,11 @@ public:
     /// absolute position.
     V3 r() const;
 
+    void impulse(const V3& imp);
+
     /// Update the body's position, velocity, orientation, and angular momentum.
     void step(double time);
 
-private:
     /// Rotate an absolute point to this body's frame.
     V3 rotate_in(const V3& v) const;
     /// Transform an absolute position vector to this body's frame.
@@ -56,6 +57,7 @@ private:
     /// Transform a position vector in this body's frame to the absolute frame.
     V3 transform_out(const V3& v) const;
 
+private:
     /// @return Total rotational inertia about a point.
     M3 I(const V3& center);
     /// Take care of conservation of linear and angular momentum when a body is added.

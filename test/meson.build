@@ -1,6 +1,7 @@
 loft_test_sources = [
   'test.cc',
   'test-body.cc',
+  'test-world.cc',
 ]
 
 inc = include_directories('.', '../loftlib')

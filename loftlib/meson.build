@@ -2,6 +2,7 @@ loftlib_sources = [
   'body.cc',
   'three-vector.cc',
   'universe.cc',
+  'world.cc',
 ]
 
 loftlib = shared_library('loftlib',

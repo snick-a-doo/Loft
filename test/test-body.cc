@@ -1,26 +1,57 @@
 #include "body.hh"
-#include "universe.hh"
+#include "test.hh"
+
 #include "doctest.h"
 
 #include <iostream>
 #include <numbers>
+#include <numeric>
+#include <vector>
 
-template<typename T> bool close(const T& actual, const T& expected, double tol)
+using Momentum = std::pair<V3, V3>;
+using Body_Ptr = std::shared_ptr<Body>;
+Momentum momentum(const std::vector<Body_Ptr>& bs)
 {
-    if (close(actual.x, expected.x, tol)
-        && close(actual.y, expected.y, tol)
-        && close(actual.z, expected.z, tol))
+    return std::make_pair(
+        // Linear momentum
+        std::accumulate(bs.begin(), bs.end(), V0,
+                        [](const V3& p, Body_Ptr b){ return p + b->v_cm()*b->m(); }),
+        // Angular momentum
+        std::accumulate(bs.begin(), bs.end(), V0,
+                        [](const V3& p, Body_Ptr b){
+                            return p + b->I()*b->omega()
+                                + b->m()*cross(b->r(), b->v_cm()); }));
+}
+
+bool check_momentum(const Momentum& p1, const Momentum& p2)
+{
+    if (p1 == p2)
         return true;
-    std::cout << actual << " != " << expected << " ±" << tol << std::endl;
+    std::cout << p1.first << ", " << p1.second << " != "
+              << p2.first << ", " << p2.second << std::endl;
     return false;
 }
-template<> bool close(const double& actual, const double& expected, double tol)
+
+/// RAII class for checking that linear and angular don't change.
+class Check_Momentum
 {
-    if (std::abs(expected - actual) < tol)
-        return true;
-    std::cout << actual << " != " << expected << " ±" << tol << std::endl;
-    return false;
-}
+public:
+    Check_Momentum(const std::vector<Body_Ptr>& bs)
+        : m_bs(bs),
+          m_p1(momentum(bs))
+    {}
+    ~Check_Momentum() {
+        check();
+    }
+    void check() const {
+        auto m_p2 = momentum(m_bs);
+        CHECK(close(m_p1.first, m_p2.first, 1e-9));
+        CHECK(close(m_p1.second, m_p2.second, 1e-9));
+    }
+private:
+    std::vector<Body_Ptr> m_bs;
+    Momentum m_p1;
+};
 
 const V3 V111 = V3(1, 1, 1);
 
@@ -32,6 +63,7 @@ auto Myz = rot(My, pi/2*Vz); // == My*Mz (passive rotations)
 TEST_CASE("single rest")
 {
     auto b = std::make_shared<Body>(2.0, M1, Vx, V0, M1, V0);
+    Check_Momentum check_p({b});
     CHECK(b->m() == 2.0);
     CHECK(b->I() == M1);
     CHECK(b->r_cm() == Vx);
@@ -52,6 +84,7 @@ TEST_CASE("single rest")
 TEST_CASE("single move")
 {
     auto b = std::make_shared<Body>(2.0, M1, Vx, V111, M1, Vz);
+    Check_Momentum check_p({b});
     CHECK(b->m() == 2.0);
     CHECK(b->I() == M1);
     CHECK(b->r_cm() == Vx);
@@ -73,6 +106,7 @@ TEST_CASE("2-point static")
 {
     auto b1 = std::make_shared<Body>(2.0, M1, 6*Vz, V0, My, V0);
     auto b2 = std::make_shared<Body>(6.0, M1, 2*Vz, V0, Myz, V0);
+    Check_Momentum check_p({b1, b2});
     CHECK(close(b1->orientation()*Vx, -Vz, 1e-9));
     CHECK(close(b1->orientation()*Vy, Vy, 1e-9));
     CHECK(close(b1->orientation()*Vz, Vx, 1e-9));
@@ -122,6 +156,8 @@ TEST_CASE("2-point translate")
 {
     auto b1 = std::make_shared<Body>(2.0, M1, 6*Vz, -4*Vz, My, V0);
     auto b2 = std::make_shared<Body>(6.0, M1, 2*Vz, V0, Myz, V0);
+    Check_Momentum check_p({b1, b2});
+
     b1->capture(b2);
     CHECK(b1->m() == 8.0);
     CHECK(b2->m() == 6.0);
@@ -162,6 +198,7 @@ TEST_CASE("2-point rotate")
 {
     auto b1 = std::make_shared<Body>(2.0, M1, 6*Vz, 3*Vx, My, V0);
     auto b2 = std::make_shared<Body>(6.0, M1, 2*Vz, -Vx, Myz, V0);
+    Check_Momentum check_p({b1, b2});
     double w = 12.0/13.0;
     auto r1_hat = V3(sin(w), 0, cos(w));
 
@@ -203,10 +240,55 @@ TEST_CASE("2-point rotate")
     CHECK(b2->omega() == w*Vy);
 }
 
+TEST_CASE("2-point spin")
+{
+    auto b1 = std::make_shared<Body>(2.0, 2*M1, 6*Vz, V0, My, Vy);
+    auto b2 = std::make_shared<Body>(6.0, M1, 2*Vz, V0, Myz, 2*Vy);
+    Check_Momentum check_p({b1, b2});
+    double w = 4.0/27.0;
+    auto r1_hat = V3(sin(w), 0, cos(w));
+
+    b1->capture(b2);
+    CHECK(b1->r_cm() == 3*Vz);
+    CHECK(b1->v_cm() == V0);
+    CHECK(b1->r() == 6*Vz);
+    CHECK(close(b2->r_cm(), 4*Vx, 1e-9));
+    CHECK(b1->orientation() == My);
+    CHECK(b2->orientation() == Mz);
+    CHECK(b1->omega() == w*Vy);
+
+    b1->step(1.0);
+    CHECK(b1->r() == 3*Vz + 3*r1_hat);
+    CHECK(close(b2->r_cm(), 4*Vx, 1e-9));
+    CHECK(close(b2->r(), 4*Vx, 1e-9));
+    CHECK(close(b1->r_cm(), 3*Vz, 1e-9));
+    CHECK(b1->v_cm() == V0);
+    CHECK(close(b1->orientation()*Vz, V3(cos(w), 0, -sin(w)), 1e-9));
+    CHECK(close(b2->orientation()*Vx, Vy, 1e-9));
+    CHECK(b2->orientation() == Mz);
+    CHECK(b1->omega() == w*Vy);
+    CHECK(b2->omega() == V0);
+
+    b1->release(b2);
+    CHECK(b1->r() == 3*Vz + 3*r1_hat);
+    CHECK(close(b2->r(), 3*Vz - r1_hat, 1e-9));
+    CHECK(b1->r_cm() == b1->r());
+    CHECK(b2->r_cm() == b2->r());
+    CHECK(close(b1->v_cm(), cross(w*Vy, 3*r1_hat), 1e-9));
+    CHECK(close(b2->v_cm(), cross(w*Vy, -r1_hat), 1e-9));
+    CHECK(close(b1->orientation()*Vz, V3(cos(w), 0, -sin(w)), 1e-9));
+    CHECK(close(b2->orientation()*Vx, Vy, 1e-9));
+    CHECK(close(b2->orientation()*Vy, V3(sin(w), 0, cos(w)), 1e-9));
+    CHECK(close(b2->orientation()*Vz, V3(cos(w), 0, -sin(w)), 1e-9));
+    CHECK(b1->omega() == w*Vy);
+    CHECK(b2->omega() == w*Vy);
+}
+
 TEST_CASE("2-point rotate and translate")
 {
     auto b1 = std::make_shared<Body>(2.0, M1, 6*Vz, 6*Vx, My, V0);
     auto b2 = std::make_shared<Body>(6.0, M1, 2*Vz, 2*Vx, Myz, V0);
+    Check_Momentum check_p({b1, b2});
     double w = 12.0/13.0;
     auto r1_hat = V3(sin(w), 0, cos(w));
 
@@ -245,6 +327,10 @@ TEST_CASE("2-point rotate and translate")
 
 // TEST_CASE("3-point")
 // {
+//     auto b1 = std::make_shared<Body>(2.0, M1, 1*Vx, 6*Vx, My, V0);
+//     auto b2 = std::make_shared<Body>(6.0, M1, 2*Vx, 2*Vx, Myz, V0);
+//     auto b3 = std::make_shared<Body>(3.0, M1, 3*Vx, 2*Vx, Myz, V0);
+
 //     auto b1 = std::make_shared<Body>(1.0, 1.0, M1);
 //     auto b2 = std::make_shared<Body>(1.0, 1.0, M1);
 //     auto b3 = std::make_shared<Body>(1.0, 1.0, M1);
