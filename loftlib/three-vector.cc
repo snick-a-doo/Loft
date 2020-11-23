@@ -1,5 +1,6 @@
 #include "three-vector.hh"
 
+#include <cassert>
 #include <ranges>
 
 using std::views::iota;
@@ -121,6 +122,11 @@ namespace std
     {
         return os << '[' << m.x << " " << m.y << " " << m.z << ']';
     }
+}
+
+V3 rot(const V3& v, const V3& a)
+{
+    return rot(M1, a)*v;
 }
 
 M3 rot(const M3& m, const V3& a)
@@ -250,4 +256,64 @@ M3& operator+=(M3& m1, const M3& m2)
 {
     m1 = m1 + m2;
     return m1;
+}
+
+std::tuple<V3, double> axis_angle(const M3& m)
+{
+    // To convert the rotation matrix representation of the body's orientation to an
+    // axis-angle orientation, we transform first to a quaternion representation.  The
+    // matrix-to-quaternion and quaternion-to-axis-angle transformations are described in
+    // the Matrix and Quaternion FAQ (matrixfaq.htm) in the doc directory.
+
+    // Convert from matrix to quaternion
+    double trace = m.x.x +  m.y.y +  m.z.z + 1.0;
+    double s, w, x, y, z;
+    s = w = x = y = z = 0.0;
+    if (trace > 0.0)
+    {
+        s = 0.5/sqrt(trace);
+        w = 0.25/s;
+        x = (m.z.y -  m.y.z)*s;
+        y = (m.x.z -  m.z.x)*s;
+        z = (m.y.x -  m.x.y)*s;
+    }
+    else
+    {
+        // Find the largest diagonal element and do the appropriate transformation.
+        double largest =  m.x.x;
+        int index = 0;
+        if (m.y.y > largest)
+        {
+            largest =  m.y.y;
+            index = 1;
+        }
+
+        if (m.z.z > largest)
+        {
+            largest =  m.z.z;
+            s = sqrt(1.0 -  m.x.x -  m.y.y +  m.z.z) * 2.0;
+            w = (m.x.y +  m.y.x)/s;
+            x = (m.x.z +  m.z.x)/s;
+            y = (m.y.z +  m.z.y)/s;
+            z = 0.5/s;
+        }
+        else if (index == 0)
+        {
+            s = sqrt(1.0 +  m.x.x -  m.y.y -  m.z.z) * 2.0;
+            w = (m.y.z +  m.z.y)/s;
+            x = 0.5/s;
+            y = (m.x.y +  m.y.x)/s;
+            z = (m.x.z +  m.z.x)/s;
+        }
+        else
+        {
+            assert(index == 1);
+            s = sqrt(1.0 -  m.x.x +  m.y.y -  m.z.z) * 2.0;
+            w = (m.x.z +  m.z.x)/s;
+            x = (m.x.y +  m.y.x)/s;
+            y = 0.5/s;
+            z = (m.y.z +  m.z.y)/s;
+        }
+    }
+    return std::make_tuple(V3(x, y, z), acos(w) * 2.0);
 }

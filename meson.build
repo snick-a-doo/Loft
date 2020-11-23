@@ -6,3 +6,4 @@ add_global_arguments('-Dwarning_level=3', language: 'cpp')
 
 subdir('loftlib')
 subdir('test')
+subdir('view')

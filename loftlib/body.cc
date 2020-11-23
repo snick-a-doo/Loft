@@ -49,6 +49,9 @@ void Body::release(Body_ptr part)
 
 void Body::add_momentum(const Body_ptr part)
 {
+    // Assume constant omega (infinite inertia) if the inertia matrix is singular.
+    if (det(m_inertia) == 0)
+        return;
     if (m_parent)
         return m_parent->add_momentum(part);
 
@@ -106,6 +109,16 @@ V3 Body::transform_out(const V3& v) const
 {
     V3 v_out = m_r + m_orientation*v;
     return m_parent ? m_parent->transform_out(v_out) : v_out;
+}
+
+bool Body::is_free() const
+{
+    return !m_parent;
+}
+
+bool Body::intersects(const Body& b) const
+{
+    return false;
 }
 
 const Body* Body::top() const

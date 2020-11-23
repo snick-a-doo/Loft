@@ -3,6 +3,7 @@
 
 #include <cmath>
 #include <iostream>
+#include <tuple>
 
 struct V3
 {
@@ -26,10 +27,15 @@ V3 cross(const V3& v1, const V3& v2);
 M3 outer(const V3& v1, const V3& v2);
 double mag(const V3& v);
 V3 unit(const V3& v);
+// @return Vector v rotated about a by ||a|| radians.
+V3 rot(const V3& v, const V3& a);
+// @return Orientation matrix m rotated about a by ||a|| radians.
 M3 rot(const M3& m, const V3& a);
 double det(const M3& m);
 M3 inv(const M3& m);
 M3 tr(const M3& m);
+// @return An axis vector and an angle in radians.  The length of the vector is arbitrary.
+std::tuple<V3, double> axis_angle(const M3& m);
 
 V3 operator-(const V3& v);
 

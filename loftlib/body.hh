@@ -43,6 +43,7 @@ public:
     /// absolute position.
     V3 r() const;
 
+    /// Impart an impulse -- a discontinuous change in momentum.
     void impulse(const V3& imp);
 
     /// Update the body's position, velocity, orientation, and angular momentum.
@@ -56,6 +57,11 @@ public:
     V3 rotate_out(const V3& v) const;
     /// Transform a position vector in this body's frame to the absolute frame.
     V3 transform_out(const V3& v) const;
+
+    /// @return True if this body is not captured by another body.
+    bool is_free() const;
+    /// @return True if this body occupies some of the same space as another.
+    virtual bool intersects(const Body& b) const;
 
 private:
     /// @return Total rotational inertia about a point.
