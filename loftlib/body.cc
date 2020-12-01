@@ -77,20 +77,14 @@ void Body::add_momentum(const Body_ptr part)
     auto r_part = part->r_cm() - new_cm;
     auto L_spin_part = part->I()*part->omega();
     auto L_orbit_part = part_m*cross(r_part, part->v_cm());
-    // std::cout << new_cm << ' ' << r_head << ' ' << r_part << std::endl;
-    // std::cout << I_head << ' ' << I_part << std::endl;
-    // std::cout << m_omega << std::endl;
-    // std::cout << v_cm << ' ' << part->v_cm() << std::endl;
-    // std::cout << L_spin_head << ' ' << L_orbit_head << ' '
-    //           << L_spin_part << ' ' << L_orbit_part << std::endl;
     m_omega = inv(I(new_cm) + part->I(new_cm))
         *(L_spin_head + L_orbit_head + L_spin_part + L_orbit_part);
 }
 
 V3 Body::rotate_in(const V3& v) const
 {
-    V3 v_in = tr(m_orientation)*v;
-    return m_parent ? m_parent->rotate_in(v_in) : v_in;
+    // Innermost rotation is done last.
+    return tr(m_orientation)*(m_parent ? m_parent->rotate_in(v) : v);
 }
 
 V3 Body::transform_in(const V3& v) const
@@ -101,6 +95,7 @@ V3 Body::transform_in(const V3& v) const
 
 V3 Body::rotate_out(const V3& v) const
 {
+    // Innermost rotation is done first.
     V3 v_out = m_orientation*v;
     return m_parent ? m_parent->rotate_out(v_out) : v_out;
 }
@@ -119,11 +114,6 @@ bool Body::is_free() const
 bool Body::intersects(const Body& b) const
 {
     return false;
-}
-
-const Body* Body::top() const
-{
-    return m_parent ? m_parent->top() : this;
 }
 
 double Body::m() const
@@ -154,10 +144,13 @@ V3 Body::r() const
 V3 Body::r_cm() const
 {
     // Head position is added after dividing by total mass.
+    double total = m();
+    if (total < 1e-9)
+        return m_r;
     return m_r + std::accumulate(m_subs.begin(), m_subs.end(), V0,
                                  [this](const V3& rm, Body_ptr b){
                                      return rm + rotate_out(b->r_cm())*b->m(); })
-        /m();
+        /total;
 }
 
 V3 Body::v_cm() const
@@ -180,6 +173,12 @@ void Body::impulse(const V3& imp)
     m_v_cm += imp/m();
 }
 
+void Body::impulse(const V3& imp, const V3& r)
+{
+    Body::impulse(imp);
+    m_omega += cross(r - r_cm(), imp)*inv(I());
+}
+
 void Body::step(double time)
 {
     // The origin of the body, m_r, is generally not at the CM.  Find the new origin after
@@ -187,9 +186,29 @@ void Body::step(double time)
     // and then transforming back out of the body's frame.
     auto cm = r_cm();
     auto dr = rotate_in(cm - m_r);
-    m_orientation = rot(m_orientation, m_omega*time);
+    m_orientation = rot(m_orientation, rotate_in(m_omega)*time);
     m_r = cm + m_v_cm*time - rotate_out(dr);
 
     for (auto b : m_subs)
         b->step(time);
+}
+
+void Body::set_r(const V3& r)
+{
+    m_r = r;
+}
+
+void Body::set_orientation(const M3& o)
+{
+    m_orientation = o;
+}
+
+void Body::set_mass(double m)
+{
+    m_mass = m;
+}
+
+void Body::set_inertia(const M3& i)
+{
+    m_inertia = i;
 }

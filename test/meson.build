@@ -1,6 +1,8 @@
 loft_test_sources = [
   'test.cc',
   'test-body.cc',
+  'test-rocket.cc',
+  'test-transform.cc',
   'test-world.cc',
 ]
 

@@ -5,7 +5,6 @@
 
 #include "doctest.h"
 
-#include <fstream>
 #include <numbers>
 
 using namespace std::numbers;
@@ -64,26 +63,91 @@ TEST_CASE("Body on Earth")
     all.step(8616.41); // 0.1 siderial day
     auto axis2 = earth->rotate_out(Vz);
     // Check that the axis of rotation is fixed.
-    CHECK(axis2 == axis);
+    CHECK(close(axis2, axis, 1e-9));
     // Check that the body moves with the surface of the earth.
     CHECK(close(earth->transform_out(b->r()), rot(r_earth*Vx, 0.2*pi*axis), 1e-9));
 }
 
 TEST_CASE("locate")
 {
+    using units::deg;
     auto tilt_0 = std::make_shared<World>(m_earth, r_earth, V0, V0, M1, 0);
     // Zero longitude is in the y-direction to match the gluSphere texture origin.
-    CHECK(close(tilt_0->locate(0.0, 0.0, 0.0), r_earth*Vy, 1e-9));
-    CHECK(close(tilt_0->locate(45.0, 0.0, 0.0), sqrt2/2*r_earth*V3(0, 1, 1), 1e-9));
-    CHECK(close(tilt_0->locate(-45.0, 90.0, 0.0), sqrt2/2*r_earth*V3(-1, 0, -1), 1e-9));
-    CHECK(close(tilt_0->locate(-45.0, -90.0, r_earth),
-                sqrt2*r_earth*V3(1, 0, -1), 1e-6));
+    SUBCASE("origin")
+    {
+        auto [r, o] = tilt_0->locate(0.0, 0.0, 0.0);
+        CHECK(close(r, r_earth*Vy, 1e-9));
+        CHECK(close(o*Vx, -Vx, 1e-9));
+        CHECK(close(o*Vy, Vz, 1e-9));
+        CHECK(close(o*Vz, Vy, 1e-9));
+    }
+    SUBCASE("lat 45N, lon 0")
+    {
+        auto [r, o] = tilt_0->locate(deg(45.0), 0.0, 0.0);
+        CHECK(close(r, sqrt2/2*r_earth*V3(0, 1, 1), 1e-9));
+        CHECK(close(o*Vx, -Vx, 1e-9));
+        CHECK(close(o*Vy, sqrt2/2*V3(0, -1, 1), 1e-9));
+        CHECK(close(o*Vz, sqrt2/2*V3(0, 1, 1), 1e-9));
+    }
+    SUBCASE("lat 45S, lon 90E")
+    {
+        auto [r, o] = tilt_0->locate(deg(-45.0), deg(90.0), 0.0);
+        CHECK(close(r, sqrt2/2*r_earth*V3(-1, 0, -1), 1e-9));
+        CHECK(close(o*Vx, -Vy, 1e-9));
+        CHECK(close(o*Vy, sqrt2/2*V3(-1, 0, 1), 1e-9));
+        CHECK(close(o*Vz, sqrt2/2*V3(-1, 0, -1), 1e-9));
+    }
+    SUBCASE("lat 45S, lon 90W")
+    {
+        auto [r, o] = tilt_0->locate(deg(-45.0), deg(-90.0), r_earth);
+        CHECK(close(r, sqrt2*r_earth*V3(1, 0, -1), 1e-6));
+        CHECK(close(o*Vx, Vy, 1e-9));
+        CHECK(close(o*Vy, sqrt2/2*V3(1, 0, 1), 1e-9));
+        CHECK(close(o*Vz, sqrt2/2*V3(1, 0, -1), 1e-9));
+    }
 
-    auto orientation = rot(M1, units::deg(45)*Vy);
-    auto tilt_45 = std::make_shared<World>(m_earth, r_earth, V0, V0, orientation, 0);
-    // Zero longitude is in the y-direction to match the gluSphere texture origin.
-    CHECK(close(tilt_45->locate(0.0, 0.0, 0.0), r_earth*Vy, 1e-6));
-    CHECK(close(tilt_45->locate(0.0, 90.0, 0.0), sqrt2/2.0*r_earth*V3(-1, 0, 1), 1e-6));
-    CHECK(close(tilt_45->locate(-45.0, 90.0, 0.0), -r_earth*Vx, 1e-6));
-    CHECK(close(tilt_45->locate(45.0, -90.0, r_earth), 2.0*r_earth*Vx, 1e-6));
+    auto orientation = rot(M1, deg(45)*Vy);
+    auto tilt_45 = std::make_shared<World>(m_earth, r_earth, V0, V0, orientation, 4);
+    SUBCASE("tilt origin")
+    {
+        auto [r, o] = tilt_45->locate(0.0, 0.0, 0.0);
+        CHECK(close(r, r_earth*Vy, 1e-9));
+        CHECK(close(o*Vx, sqrt2/2*V3(-1, 0, 1), 1e-9));
+        CHECK(close(o*Vy, sqrt2/2*V3(1, 0, 1), 1e-9));
+        CHECK(close(o*Vz, Vy, 1e-9));
+    }
+    SUBCASE("tilt lat 0, lon 90E")
+    {
+        auto [r, o] = tilt_45->locate(0.0, deg(90.0), 0.0);
+        CHECK(close(r, sqrt2/2*r_earth*V3(-1, 0, 1), 1e-6));
+        CHECK(close(o*Vx, -Vy, 1e-9));
+        CHECK(close(o*Vy, sqrt2/2*V3(1, 0, 1), 1e-9));
+        CHECK(close(o*Vz, sqrt2/2*V3(-1, 0, 1), 1e-9));
+    }
+    SUBCASE("tilt lat 45S, lon 90E")
+    {
+        auto [r, o] = tilt_45->locate(deg(-45.0), deg(90.0), 0.0);
+        CHECK(close(r, -r_earth*Vx, 1e-6));
+        CHECK(close(o*Vx, -Vy, 1e-9));
+        CHECK(close(o*Vy, Vz, 1e-9));
+        CHECK(close(o*Vz, -Vx, 1e-9));
+    }
+    SUBCASE("tilt lat 45N, lon 90W")
+    {
+        auto [r, o] = tilt_45->locate(deg(45.0), deg(-90.0), r_earth);
+        CHECK(close(r, 2*r_earth*Vx, 1e-6));
+        CHECK(close(o*Vx, Vy, 1e-9));
+        CHECK(close(o*Vy, Vz, 1e-9));
+        CHECK(close(o*Vz, Vx, 1e-9));
+    }
+    SUBCASE("tilt lat 45S, lon 0 quarter day")
+    {
+        // Same as 45S, lon 90E
+        tilt_45->step(1);
+        auto [r, o] = tilt_45->locate(deg(-45.0), 0.0, 0.0);
+        CHECK(close(r, -r_earth*Vx, 1e-6));
+        CHECK(close(o*Vx, -Vy, 1e-9));
+        CHECK(close(o*Vy, Vz, 1e-9));
+        CHECK(close(o*Vz, -Vx, 1e-9));
+    }
 }

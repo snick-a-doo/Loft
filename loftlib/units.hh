@@ -1,6 +1,8 @@
 #ifndef LOFT_LOFTLIB_UNITS_HH_INCLUDED
 #define LOFT_LOFTLIB_UNITS_HH_INCLUDED
 
+#include "three-vector.hh"
+
 #include <numbers>
 
 using namespace std::numbers;
@@ -22,7 +24,7 @@ namespace units
             minutes = -std::abs(minutes);
             seconds = -std::abs(seconds);
         }
-        return degrees + minutes/60 + seconds/3600;
+        return deg(degrees + minutes/60 + seconds/3600);
     }
 
     /// @param day A span of time in siderial Earth days.
@@ -31,6 +33,10 @@ namespace units
     {
         return days*8'6164.1;
     }
+
+    M3 I_cylinder_shell(double m, double r, double l);
+    M3 I_cylinder_solid(double m, double r, double l);
+    double V_cylinder(double r, double l);
 }
 
 namespace consts

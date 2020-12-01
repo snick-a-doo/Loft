@@ -54,6 +54,7 @@ private:
 };
 
 const V3 V111 = V3(1, 1, 1);
+const V3 V110 = V3(1, 1, 0);
 
 using namespace std::numbers;
 auto Mz = rot(M1, pi/2*Vz);
@@ -100,6 +101,42 @@ TEST_CASE("single move")
     CHECK(b->r() == V3(2, 1, 1));
     CHECK(b->orientation()*Vx == V3(cos(1), sin(1), 0));
     CHECK(b->omega() == Vz);
+}
+
+TEST_CASE("single impulse")
+{
+    auto om = rot(M1, pi/2*Vy);
+    auto b = std::make_shared<Body>(2.0, M1, 2*Vx, V0, om, V0);
+    SUBCASE("at CM")
+    {
+        b->impulse(4*V111);
+        Check_Momentum check_p({b});
+        CHECK(b->r_cm() == 2*Vx);
+        CHECK(b->v_cm() == 2*V111);
+        CHECK(b->orientation() == om);
+        CHECK(b->omega() == V0);
+        b->step(2.0);
+        CHECK(b->r_cm() == 2*Vx + 4*V111);
+        CHECK(b->v_cm() == 2*V111);
+        CHECK(b->orientation() == om);
+        CHECK(b->omega() == V0);
+    }
+    SUBCASE("at origin")
+    {
+        b->impulse(2*V3(1, 1, 0), V0);
+        Check_Momentum check_p({b});
+        CHECK(b->r_cm() == 2*Vx);
+        CHECK(b->v_cm() == V110);
+        CHECK(b->orientation() == om);
+        CHECK(b->omega() == -4*Vz);
+        b->step(pi/4); // half turn
+        CHECK(b->r_cm() == 2*Vx + pi/4*V110);
+        CHECK(b->v_cm() == V110);
+        CHECK(close(b->rotate_in(Vx), -Vz, 1e-9));
+        CHECK(close(b->rotate_in(Vy), -Vy, 1e-9));
+        CHECK(close(b->rotate_in(Vz), -Vx, 1e-9));
+        CHECK(b->omega() == -4*Vz);
+    }
 }
 
 TEST_CASE("2-point static")

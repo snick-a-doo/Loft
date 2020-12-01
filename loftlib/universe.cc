@@ -2,6 +2,8 @@
 #include "units.hh"
 #include "universe.hh"
 
+#include <cassert>
+
 V3 gravity(const Body& p1, const Body& p2)
 {
     auto r = p2.r_cm() - p1.r_cm();
@@ -23,6 +25,7 @@ void Universe::step(double time)
         auto it2 = it1;
         for(++it2; it2 != m_body.end(); ++it2)
         {
+            assert(it1 != it2);
             if (!(*it2)->is_free())
                 continue;
             auto& p1 = **it1;
@@ -49,7 +52,7 @@ void Universe::step(double time)
                 continue;
             auto& p1 = **it1;
             const auto& p2 = **it2;
-            if (p1.intersects(p2))
+            if (p1.intersects(p2) && dot(p1.v_cm(), p2.v_cm()) < 0.0)
                 p1.capture(*it2);
         }
     }
