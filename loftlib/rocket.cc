@@ -1,5 +1,24 @@
+//  Copyright (C) 2022 Sam Varner
+//
+//  This file is part of Laft.
+//
+//  Loft is free software: you can redistribute it and/or modify it under the terms of
+//  the GNU General Public License as published by the Free Software Foundation, either
+//  version 3 of the License, or (at your option) any later version.
+//
+//  Vamos is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+//  PURPOSE.  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Vamos.
+//  If not, see <http://www.gnu.org/licenses/>.
+
 #include "rocket.hh"
 #include "units.hh"
+
+#include <numbers>
+
+using namespace std::numbers;
 
 /// A cylindrical volume of fuel.  The fuel is treated as a solid slug that remains at the
 /// bottom (minimum z) of the fuel tank.
@@ -43,8 +62,8 @@ Fuel::Fuel(double radius, double depth, double density, double impulse)
 
 double Fuel::get_impulse(double volume)
 {
-    double V = m_depth*m_area;
-    double dV = std::min(V, volume);
+    auto V{m_depth*m_area};
+    auto dV{std::min(V, volume)};
     V -= dV;
     set_mass(V*m_density);
     m_depth = V/m_area;
@@ -52,7 +71,6 @@ double Fuel::get_impulse(double volume)
     set_r((m_depth - m_full_depth)/2*Vz);
     set_inertia(units::I_cylinder_solid(m(), m_radius, m_depth));
     return m_impulse*m_density*dV;
-    // return m_impulse*m_density*dV;
 }
 
 
@@ -69,7 +87,7 @@ public:
     void throttle(double frac);
     /// Set the direction of engine thrust.
     /// @param v Rotate thrust from the z-direction about the rocket-frame axis and angle.
-    void orient(const V3& v);
+    void orient(V3 const& v);
     /// @return The amount of fuel consumed in the given time interval.
     double consumed(double time) const;
     /// @return The impulse vector to apply to the rocket.
@@ -87,14 +105,14 @@ Engine::Engine(double mass, double fuel_rate, double efficiency)
       m_fuel_rate(fuel_rate),
       m_efficiency(efficiency)
 {
-};
+}
 
 void Engine::throttle(double k)
 {
     m_throttle = k;
 }
 
-void Engine::orient(const V3& v)
+void Engine::orient(V3 const& v)
 {
     // The engine always produces thrust in its z-direction.
     set_orientation(rot(M1, v));
@@ -113,7 +131,7 @@ V3 Engine::get_impulse(double max_impulse) const
 
 Rocket::Rocket(double shell_mass, double engine_mass, double radius, double length,
                double fuel_density, double spec_impulse, double fuel_rate,
-               const V3& position, const M3& orientation)
+               V3 const& position, M3 const& orientation)
     : Body(shell_mass,
            units::I_cylinder_shell(shell_mass, radius, length),
            position, V0, M1, V0),
@@ -132,7 +150,7 @@ void Rocket::throttle(double frac)
     m_engine->throttle(frac);
 }
 
-void Rocket::orient_thrust(const V3& v)
+void Rocket::orient_thrust(V3 const& v)
 {
     m_engine->orient(v);
 }
@@ -146,8 +164,8 @@ void Rocket::step(double time)
 {
     if (is_free())
     {
-        double volume = m_engine->consumed(time);
-        auto imp = m_engine->get_impulse(m_fuel->get_impulse(volume));
+        auto volume{m_engine->consumed(time)};
+        auto imp{m_engine->get_impulse(m_fuel->get_impulse(volume))};
         impulse(imp, transform_out(m_engine->r_cm()));
     }
     Body::step(time);

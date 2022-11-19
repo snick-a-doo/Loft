@@ -1,6 +1,5 @@
-view_sources = [
-  'sfml-view.cc',
-]
+view_sources = ['sfml-view.cc']
+explode_sources = ['explode.cc']
 
 inc = include_directories('../loftlib')
 
@@ -14,6 +13,9 @@ view = executable('view',
                   view_sources,
                   include_directories: inc,
                   dependencies: [sfml_dep, gl_dep, glu_dep, glut_dep],
-                  link_with: [loftlib],
-                  override_options : ['cpp_std=c++2a'],
-)
+                  link_with: [loftlib])
+explode = executable('explode',
+                     explode_sources,
+                     include_directories: inc,
+                     dependencies: [sfml_dep, gl_dep, glu_dep, glut_dep],
+                     link_with: [loftlib])

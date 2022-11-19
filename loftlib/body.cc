@@ -1,12 +1,26 @@
+//  Copyright (C) 2022 Sam Varner
+//
+//  This file is part of Laft.
+//
+//  Loft is free software: you can redistribute it and/or modify it under the terms of
+//  the GNU General Public License as published by the Free Software Foundation, either
+//  version 3 of the License, or (at your option) any later version.
+//
+//  Vamos is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY;
+//  without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR
+//  PURPOSE.  See the GNU General Public License for more details.
+//
+//  You should have received a copy of the GNU General Public License along with Vamos.
+//  If not, see <http://www.gnu.org/licenses/>.
+
 #include "body.hh"
 
+#include <algorithm>
 #include <cassert>
-#include <numbers>
 #include <numeric>
-#include <ranges>
 
-Body::Body(double mass, const M3& inertia,
-           const V3 r, const V3 v, const M3& orientation, const V3 omega)
+Body::Body(double mass, M3 const& inertia,
+           const V3 r, const V3 v, M3 const& orientation, const V3 omega)
     : m_mass(mass),
       m_inertia(inertia),
       m_r(r),
@@ -31,12 +45,12 @@ void Body::capture(Body_ptr part)
 
 void Body::release(Body_ptr part)
 {
-    auto it = std::find(m_subs.begin(), m_subs.end(), part);
+    auto it{std::find(m_subs.begin(), m_subs.end(), part)};
     assert(it != m_subs.end());
     if (it == m_subs.end())
         return;
 
-    auto cm = r_cm();
+    auto cm{r_cm()};
     part->m_parent = nullptr;
     m_subs.erase(it);
 
@@ -47,7 +61,7 @@ void Body::release(Body_ptr part)
     part->m_omega = m_omega;
 }
 
-void Body::add_momentum(const Body_ptr part)
+void Body::add_momentum(Body_ptr const part)
 {
     // Assume constant omega (infinite inertia) if the inertia matrix is singular.
     if (det(m_inertia) == 0)
@@ -65,44 +79,44 @@ void Body::add_momentum(const Body_ptr part)
 
     // part must not already be a part.
     assert(!part->m_parent);
-    auto head_m = m();
-    auto part_m = part->m();
-    auto v_cm = m_v_cm;
+    auto head_m{m()};
+    auto part_m{part->m()};
+    auto v_cm{m_v_cm};
     m_v_cm = (head_m*v_cm + part_m*part->v_cm())/(head_m + part_m);
 
-    auto new_cm = (head_m*r_cm() + part_m*part->r_cm())/(head_m + part_m);
-    auto r_head = r_cm() - new_cm;
-    auto L_spin_head = I()*m_omega;
-    auto L_orbit_head = head_m*cross(r_head, v_cm);
+    auto new_cm{(head_m*r_cm() + part_m*part->r_cm())/(head_m + part_m)};
+    auto r_head{r_cm() - new_cm};
+    auto L_spin_head{I()*m_omega};
+    auto L_orbit_head{head_m*cross(r_head, v_cm)};
     auto r_part = part->r_cm() - new_cm;
-    auto L_spin_part = part->I()*part->omega();
-    auto L_orbit_part = part_m*cross(r_part, part->v_cm());
+    auto L_spin_part{part->I()*part->omega()};
+    auto L_orbit_part{part_m*cross(r_part, part->v_cm())};
     m_omega = inv(I(new_cm) + part->I(new_cm))
         *(L_spin_head + L_orbit_head + L_spin_part + L_orbit_part);
 }
 
-V3 Body::rotate_in(const V3& v) const
+V3 Body::rotate_in(V3 const& v) const
 {
     // Innermost rotation is done last.
     return tr(m_orientation)*(m_parent ? m_parent->rotate_in(v) : v);
 }
 
-V3 Body::transform_in(const V3& v) const
+V3 Body::transform_in(V3 const& v) const
 {
-    V3 v_in = tr(m_orientation)*(v - m_r);
+    auto v_in{tr(m_orientation)*(v - m_r)};
     return m_parent ? m_parent->transform_in(v_in) : v_in;
 }
 
-V3 Body::rotate_out(const V3& v) const
+V3 Body::rotate_out(V3 const& v) const
 {
     // Innermost rotation is done first.
-    V3 v_out = m_orientation*v;
+    auto v_out{m_orientation*v};
     return m_parent ? m_parent->rotate_out(v_out) : v_out;
 }
 
-V3 Body::transform_out(const V3& v) const
+V3 Body::transform_out(V3 const& v) const
 {
-    V3 v_out = m_r + m_orientation*v;
+    auto v_out{m_r + m_orientation*v};
     return m_parent ? m_parent->transform_out(v_out) : v_out;
 }
 
@@ -111,7 +125,7 @@ bool Body::is_free() const
     return !m_parent;
 }
 
-bool Body::intersects(const Body& b) const
+bool Body::intersects(Body const&) const
 {
     return false;
 }
@@ -127,12 +141,12 @@ M3 Body::I()
     return I(m_parent ? m_parent->transform_out(r_cm()) : r_cm());
 }
 
-M3 Body::I(const V3& center)
+M3 Body::I(V3 const& center)
 {
-    V3 r = (m_parent ? m_parent->transform_out(m_r) : m_r) - center;
+    V3 r{(m_parent ? m_parent->transform_out(m_r) : m_r) - center};
     return std::accumulate(m_subs.begin(), m_subs.end(),
                            m_inertia + m_mass*(square(r)*M1 - outer(r, r)),
-                           [center](const M3& i, const Body_ptr b){
+                           [center](M3 const& i, const Body_ptr b){
                                return i + b->I(center); });
 }
 
@@ -144,11 +158,11 @@ V3 Body::r() const
 V3 Body::r_cm() const
 {
     // Head position is added after dividing by total mass.
-    double total = m();
+    auto total{m()};
     if (total < 1e-9)
         return m_r;
     return m_r + std::accumulate(m_subs.begin(), m_subs.end(), V0,
-                                 [this](const V3& rm, Body_ptr b){
+                                 [this](V3 const& rm, Body_ptr b){
                                      return rm + rotate_out(b->r_cm())*b->m(); })
         /total;
 }
@@ -158,22 +172,22 @@ V3 Body::v_cm() const
     return m_v_cm;
 }
 
-const M3& Body::orientation() const
+M3 const& Body::orientation() const
 {
     return m_orientation;
 }
 
-const V3& Body::omega() const
+V3 const& Body::omega() const
 {
     return m_omega;
 }
 
-void Body::impulse(const V3& imp)
+void Body::impulse(V3 const& imp)
 {
     m_v_cm += imp/m();
 }
 
-void Body::impulse(const V3& imp, const V3& r)
+void Body::impulse(V3 const& imp, V3 const& r)
 {
     Body::impulse(imp);
     m_omega += cross(r - r_cm(), imp)*inv(I());
@@ -184,21 +198,20 @@ void Body::step(double time)
     // The origin of the body, m_r, is generally not at the CM.  Find the new origin after
     // rotation by transforming CM - m_r into the body's frame before rotating the body,
     // and then transforming back out of the body's frame.
-    auto cm = r_cm();
-    auto dr = rotate_in(cm - m_r);
+    auto cm{r_cm()};
+    auto dr{rotate_in(cm - m_r)};
     m_orientation = rot(m_orientation, rotate_in(m_omega)*time);
     m_r = cm + m_v_cm*time - rotate_out(dr);
-
     for (auto b : m_subs)
         b->step(time);
 }
 
-void Body::set_r(const V3& r)
+void Body::set_r(V3 const& r)
 {
     m_r = r;
 }
 
-void Body::set_orientation(const M3& o)
+void Body::set_orientation(M3 const& o)
 {
     m_orientation = o;
 }
@@ -208,7 +221,7 @@ void Body::set_mass(double m)
     m_mass = m;
 }
 
-void Body::set_inertia(const M3& i)
+void Body::set_inertia(M3 const& i)
 {
     m_inertia = i;
 }

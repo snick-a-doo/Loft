@@ -7,6 +7,4 @@ loftlib_sources = [
   'world.cc',
 ]
 
-loftlib = shared_library('loftlib',
-                         loftlib_sources,
-                         override_options : ['cpp_std=c++2a'])
+loftlib = shared_library('loftlib', loftlib_sources)

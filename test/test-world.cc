@@ -30,7 +30,7 @@ TEST_CASE("Earth and Moon")
     double perigee = 3.626e8;
     auto moon = std::make_shared<World>(m_moon, r_moon, 4.054e8*Vx, 0.97e3*Vy, M1,
                                          units::day(27.32));
-    Universe all;
+    Universe all(false);
     all.add(earth);
     all.add(moon);
 
@@ -54,7 +54,7 @@ TEST_CASE("Body on Earth")
     auto earth = std::make_shared<World>(m_earth, r_earth, V0, V0, orientation,
                                          units::day(1.0));
     auto b = std::make_shared<Body>(2.0, M1, r_earth*Vx, V0, M1, V0);
-    Universe all;
+    Universe all(true);
     all.add(earth);
     all.add(b);
     earth->capture(b);

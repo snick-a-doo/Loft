@@ -4,7 +4,10 @@
 
 #include "doctest.h"
 
+#include <numbers>
+
 using units::deg;
+using namespace std::numbers;
 
 TEST_CASE("origin")
 {

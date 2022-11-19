@@ -1,0 +1,4 @@
+* Loft
+3D celestial mechanics and rocket simulatior
+
+Rigid bodies interact by gravition and collision in a 3D universe.
